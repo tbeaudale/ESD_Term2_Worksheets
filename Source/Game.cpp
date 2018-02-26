@@ -68,6 +68,18 @@ bool BreakoutGame::init()
 		block_sprite[i]->yPos(30 + (floor(i / 6) * 50));
 	}
 
+	for (int i = 0; i < 3; i++)
+	{
+		gem[i] = new GameObject;
+		if (gem[i]->addSpriteComponent(renderer.get(), ".\\Resources\\Textures\\puzzlepack\\png\\element_green_diamond.png") == false)
+		{
+			load = false;
+		}
+		gem_sprite[i] = gem[i]->spriteComponent()->getSprite();
+		gem[i]->direction = new vector2(0, 1);
+		gem[i]->visibility = false;
+	}
+
 	ball = new GameObject;
 	if(ball->addSpriteComponent(renderer.get(), ".\\Resources\\Textures\\puzzlepack\\png\\ballGrey.png") ==  false);
 	{
@@ -87,6 +99,9 @@ bool BreakoutGame::init()
 	paddle_sprite = paddle->spriteComponent()->getSprite();
 	paddle_sprite->xPos(250);
 	paddle_sprite->yPos(850);
+
+	srand(0);
+	nextGem = (rand() % 1000) + 1000;
 
 
 	return true;
@@ -192,11 +207,16 @@ void BreakoutGame::update(const ASGE::GameTime& us)
 	auto paddle_x = paddle_sprite->xPos();
 	auto ball_x = ball_sprite->xPos();
 	auto ball_y = ball_sprite->yPos();
+	for (int i = 0; i < 3; i++)
+	{
+		 gem_y[i] = gem_sprite[i]->yPos();
+	}
 	auto dt_sec = us.delta_time.count() / 1000.0;
 
 	rect ball_box = ball->spriteComponent()->getBoundingBox();
 	rect paddle_box = paddle->spriteComponent()->getBoundingBox();
 	rect block_box[48] = { NULL };
+	rect gem_box[3] = { NULL };
 	for (int i = 0; i < 48; i++)
 	{
 		block_box[i] = block[i]->spriteComponent()->getBoundingBox();
@@ -204,6 +224,18 @@ void BreakoutGame::update(const ASGE::GameTime& us)
 		{
 			ball->direction->y *= -1;
 			block[i]->visibility = false;
+			score += 2;
+		}
+	}
+
+	for (int i = 0; i < 3; i++)
+	{
+		gem_box[i] = gem[i]->spriteComponent()->getBoundingBox();
+		if (gem_box[i].isInside(paddle_box) && gem[i]->visibility == true)
+		{
+			gem[i]->visibility = false;
+			gemOnScreen--;
+			score += 5;
 		}
 	}
 
@@ -258,16 +290,42 @@ void BreakoutGame::update(const ASGE::GameTime& us)
 		paddle_x += 500 * dt_sec * paddle_move;
 		ball_x += 400 * ball->speed * dt_sec * ball->direction->x;
 		ball_y += 400 * ball->speed * dt_sec * ball->direction->y;
-
+		for (int i = 0; i < 3; i++)
+		{
+			if (gem[i]->visibility)
+			{
+				gem_y[i] += 300 * dt_sec * gem[i]->direction->y;
+				if (gem_sprite[i]->yPos() > game_height)
+				{
+					gemOnScreen--;
+					gem[i]->visibility = false;
+				}
+			}
+		}
+		
 	}
 
 	paddle_sprite->xPos(paddle_x);
 	ball_sprite->xPos(ball_x);
 	ball_sprite->yPos(ball_y);
-
+	for (int i = 0; i < 3; i++)
+	{
+		gem_sprite[i]->yPos(gem_y[i]);
+	}
+	
+	if (!in_menu && win == 0)
+	{
+		timeCount += us.delta_time.count();
+		if (timeCount > nextGem)
+		{
+			dropGem();
+			nextGem = (rand() % 5000) + 2000;
+			timeCount = 0;
+		}
+	}
 	//make sure you use delta time in any movement calculations!
 
-
+	
 
 }
 
@@ -295,9 +353,17 @@ void BreakoutGame::render(const ASGE::GameTime &)
 				renderer->renderSprite(*block_sprite[i]);
 			}
 		}
+		for (int i = 0; i < 3; i++)
+		{
+			if (gem[i]->visibility)
+			{
+				renderer->renderSprite(*gem_sprite[i]);
+			}
+		}
 		renderer->renderSprite(*ball_sprite);
 		renderer->renderSprite(*paddle_sprite);
 		renderer->renderText(std::to_string(lives), 40, 20);
+		renderer->renderText(std::to_string(score), 200, 20);
 		if (win == -1)
 		{
 			renderer->renderText("you lose!!!!", 300, 500);
@@ -309,4 +375,20 @@ void BreakoutGame::render(const ASGE::GameTime &)
 	}
 
 
+}
+
+void BreakoutGame::dropGem()
+{
+	if (gemOnScreen != 3);
+	{
+		gemOnScreen++;
+		gem_sprite[gemNum]->xPos(rand() % game_width - gem_sprite[gemNum]->width());
+		gem_sprite[gemNum]->yPos(gem_sprite[gemNum]->height() * -1);
+		gem[gemNum]->visibility = true;
+		gemNum++;
+		if (gemNum >= 3)
+		{
+			gemNum = 0;
+		}
+	}
 }
